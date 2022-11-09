@@ -33,7 +33,8 @@ public:
 
         EmitterQueryRecord emitterRecord(its.p);
 
-        const Emitter* em = scene->sampleEmitter(sampler->next1D(), pdflight);
+        const Emitter* em = scene->sampleEmitter(sampler, pdflight, EmitterQueryRecord(its.p));     //Importance emitter sampling
+        //const Emitter* em = scene->sampleEmitter(sampler->next1D(), pdflight);                    //Uniform light sampling
         Color3f Le = em->sample(emitterRecord, sampler->next2D(), 0.);
 
         float V(1.0f);   //Visibility term

@@ -44,11 +44,14 @@ void Scene::activate() {
 
     // Check if there's emitters attached to meshes, and
     // add them to the scene. 
+    int n_emitters(0);
     for(unsigned int i=0; i<m_meshes.size(); ++i )
         if (m_meshes[i]->isEmitter())
             m_emitters.push_back(m_meshes[i]->getEmitter());
-
+            
     m_accel->build();
+    m_pdf.clear();
+    m_pdf.reserve(n_emitters);
 
     if (!m_integrator)
         throw NoriException("No integrator was specified!");
@@ -72,6 +75,30 @@ const Emitter * Scene::sampleEmitter(float rnd, float &pdf) const {
 	size_t index = std::min(static_cast<size_t>(std::floor(n*rnd)), n - 1);
 	pdf = 1. / float(n);
 	return m_emitters[index];
+}
+
+/// Sample emitter with importance sampling
+const Emitter * Scene::sampleEmitter(Sampler *sampler, float &pdf, EmitterQueryRecord lRec) const {
+	
+    DiscretePDF m_pdf = this->m_pdf;
+    auto const & n = m_emitters.size();
+    if(n == 1)  //If only one emitter, no need to do calculations and samples
+    {
+        pdf = 1.0f;
+        return m_emitters[0];
+    }
+    //else
+    for(size_t i = 0; i < n; i++)
+    {
+        Color3f rad = m_emitters[i]->sample(lRec, sampler->next2D(), 0.f);
+        float maxRadianceCoeff = std::max(std::max(rad.x(), rad.y()), rad.z());
+        m_pdf.append(maxRadianceCoeff);
+        m_pdf.normalize();
+    }
+    size_t idx = m_pdf.sample(sampler->next1D(), pdf);
+    m_pdf.clear();
+    pdf = std::max(Epsilon,pdf);
+    return m_emitters[idx];
 }
 
 float Scene::pdfEmitter(const Emitter *em) const {

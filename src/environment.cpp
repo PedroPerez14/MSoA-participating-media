@@ -75,7 +75,7 @@ public:
 		float y = (theta) / M_PI;
 
 
-		return m_environment->eval(Point2f(x, y))* m_radiance;
+		return m_environment->eval(Point2f(x, y)) * m_radiance;
 	}
 
 	virtual Color3f sample(EmitterQueryRecord& lRec, const Point2f& sample, float optional_u) const
@@ -87,7 +87,7 @@ public:
 
 		lRec.pdf = pdf(lRec);
 
-		return eval(lRec) * m_radiance / lRec.pdf;
+		return eval(lRec) / lRec.pdf;
 	}
 
 	// Returns probability with respect to solid angle given by all the information inside the emitterqueryrecord.

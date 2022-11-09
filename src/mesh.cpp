@@ -50,8 +50,7 @@ void Mesh::activate() {
         float area = surfaceArea((n_UINT) i);
         m_pdf.append(area);
     }
-    cout << "Tenemos " << m_pdf.size() << " triangulos" << endl;
-    //TODO no me fío, a lo mejor es 1.0f / area ?
+    
     if(!m_pdf.isNormalized())
     {
         m_pdf.normalize();

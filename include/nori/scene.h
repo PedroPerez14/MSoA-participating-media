@@ -70,6 +70,10 @@ public:
 	/// Sample emitter
 	const Emitter *sampleEmitter(float rnd, float &pdf) const;
 
+    /// Sample emitter with importance sampling
+    const Emitter *sampleEmitter(Sampler *sampler, float &pdf, EmitterQueryRecord lRec) const;
+
+
     float pdfEmitter(const Emitter *em) const;
 
 	/// Get enviromental emmiter
@@ -145,6 +149,7 @@ private:
     Sampler *m_sampler = nullptr;
     Camera *m_camera = nullptr;
     Accel *m_accel = nullptr;
+    mutable DiscretePDF  m_pdf;                  ///< Discrete pdf for sampling lights uniformly wrt their radiance. WIP
 };
 
 NORI_NAMESPACE_END

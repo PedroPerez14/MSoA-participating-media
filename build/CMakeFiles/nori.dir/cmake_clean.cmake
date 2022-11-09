@@ -7,6 +7,7 @@ file(REMOVE_RECURSE
   "CMakeFiles/nori.dir/src/common.cpp.o"
   "CMakeFiles/nori.dir/src/dielectric.cpp.o"
   "CMakeFiles/nori.dir/src/diffuse.cpp.o"
+  "CMakeFiles/nori.dir/src/direct_ems.cpp.o"
   "CMakeFiles/nori.dir/src/direct_whitted.cpp.o"
   "CMakeFiles/nori.dir/src/environment.cpp.o"
   "CMakeFiles/nori.dir/src/gui.cpp.o"

@@ -670,6 +670,33 @@ src/diffuse.cpp.s:
 	$(MAKE) -f CMakeFiles/nori.dir/build.make CMakeFiles/nori.dir/src/diffuse.cpp.s
 .PHONY : src/diffuse.cpp.s
 
+src/direct_ems.o: src/direct_ems.cpp.o
+
+.PHONY : src/direct_ems.o
+
+# target to build an object file
+src/direct_ems.cpp.o:
+	$(MAKE) -f CMakeFiles/nori.dir/build.make CMakeFiles/nori.dir/src/direct_ems.cpp.o
+.PHONY : src/direct_ems.cpp.o
+
+src/direct_ems.i: src/direct_ems.cpp.i
+
+.PHONY : src/direct_ems.i
+
+# target to preprocess a source file
+src/direct_ems.cpp.i:
+	$(MAKE) -f CMakeFiles/nori.dir/build.make CMakeFiles/nori.dir/src/direct_ems.cpp.i
+.PHONY : src/direct_ems.cpp.i
+
+src/direct_ems.s: src/direct_ems.cpp.s
+
+.PHONY : src/direct_ems.s
+
+# target to generate assembly for a file
+src/direct_ems.cpp.s:
+	$(MAKE) -f CMakeFiles/nori.dir/build.make CMakeFiles/nori.dir/src/direct_ems.cpp.s
+.PHONY : src/direct_ems.cpp.s
+
 src/direct_whitted.o: src/direct_whitted.cpp.o
 
 .PHONY : src/direct_whitted.o
@@ -1308,6 +1335,9 @@ help:
 	@echo "... src/diffuse.o"
 	@echo "... src/diffuse.i"
 	@echo "... src/diffuse.s"
+	@echo "... src/direct_ems.o"
+	@echo "... src/direct_ems.i"
+	@echo "... src/direct_ems.s"
 	@echo "... src/direct_whitted.o"
 	@echo "... src/direct_whitted.i"
 	@echo "... src/direct_whitted.s"

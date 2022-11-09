@@ -12,6 +12,7 @@ set(CMAKE_DEPENDS_CHECK_CXX
   "/home/pedro/Escritorio/MRGCV/MSA/Nori2/src/common.cpp" "/home/pedro/Escritorio/MRGCV/MSA/Nori2/build/CMakeFiles/nori.dir/src/common.cpp.o"
   "/home/pedro/Escritorio/MRGCV/MSA/Nori2/src/dielectric.cpp" "/home/pedro/Escritorio/MRGCV/MSA/Nori2/build/CMakeFiles/nori.dir/src/dielectric.cpp.o"
   "/home/pedro/Escritorio/MRGCV/MSA/Nori2/src/diffuse.cpp" "/home/pedro/Escritorio/MRGCV/MSA/Nori2/build/CMakeFiles/nori.dir/src/diffuse.cpp.o"
+  "/home/pedro/Escritorio/MRGCV/MSA/Nori2/src/direct_ems.cpp" "/home/pedro/Escritorio/MRGCV/MSA/Nori2/build/CMakeFiles/nori.dir/src/direct_ems.cpp.o"
   "/home/pedro/Escritorio/MRGCV/MSA/Nori2/src/direct_whitted.cpp" "/home/pedro/Escritorio/MRGCV/MSA/Nori2/build/CMakeFiles/nori.dir/src/direct_whitted.cpp.o"
   "/home/pedro/Escritorio/MRGCV/MSA/Nori2/src/environment.cpp" "/home/pedro/Escritorio/MRGCV/MSA/Nori2/build/CMakeFiles/nori.dir/src/environment.cpp.o"
   "/home/pedro/Escritorio/MRGCV/MSA/Nori2/src/gui.cpp" "/home/pedro/Escritorio/MRGCV/MSA/Nori2/build/CMakeFiles/nori.dir/src/gui.cpp.o"

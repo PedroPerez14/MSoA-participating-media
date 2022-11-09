@@ -43,8 +43,19 @@ void Mesh::activate() {
         m_bsdf = static_cast<BSDF *>(
             NoriObjectFactory::createInstance("diffuse", PropertyList()));
     }
-
     m_pdf.reserve(m_F.cols());
+
+    for(size_t i = 0; i < m_F.cols(); i++)
+    {
+        float area = surfaceArea((n_UINT) i);
+        m_pdf.append(area);
+    }
+    cout << "Tenemos " << m_pdf.size() << " triangulos" << endl;
+    //TODO no me fío, a lo mejor es 1.0f / area ?
+    if(!m_pdf.isNormalized())
+    {
+        m_pdf.normalize();
+    }
 }
 
 float Mesh::surfaceArea(n_UINT index) const {
@@ -114,15 +125,51 @@ Point3f Mesh::getCentroid(n_UINT index) const {
  */
 void Mesh::samplePosition(const Point2f &sample, Point3f &p, Normal3f &n, Point2f &uv) const
 {
-	throw NoriException("Mesh::samplePosition() is not yet implemented!");	
+    //TODO REVISAR MUCHO
+    float sampleUpdate(sample.x());
+    n_UINT index = m_pdf.sampleReuse(sampleUpdate);   //This will change later in the assignment, creo? //TODO
+    n_UINT i0 = m_F(0, index), i1 = m_F(1, index), i2 = m_F(2, index);
+    Point3f p0 = m_V.col(i0), p1 = m_V.col(i1), p2 = m_V.col(i2);
+    Point2f sampleWeights = Warp::squareToUniformTriangle(Point2f(sampleUpdate, sample.y()));
+    
+
+    //Interpolate point
+    p = p0 * sampleWeights.x() + p1 * sampleWeights.y() +
+                p2 * (1 - sampleWeights.x() - sampleWeights.y());
+
+    //Interpolate surface normal
+    if(m_N.size() > 0)    //If we have vertex normals data
+    {
+        Point3f n0 = m_N.col(i0), n1 = m_N.col(i1), n2 = m_N.col(i2);
+        n = -(n0 * sampleWeights.x() + n1 * sampleWeights.y() +
+                n2 * (1 - sampleWeights.x() - sampleWeights.y()));
+        n.normalize();
+    }
+    else    //Otherwise, return a cross product
+    {
+        /* Find vectors for two edges sharing v[0] */
+        Vector3f edge1 = p1 - p0, edge2 = p2 - p0;
+        n = -edge1.cross(edge2);
+        n.normalize();
+    }
+
+    if(m_UV.size() > 0)
+    {
+        Point2f uv0 = m_UV.col(i0), uv1 = m_UV.col(i1), uv2 = m_UV.col(i2);
+        uv = uv0 * sampleWeights.x() + uv1 * sampleWeights.y() +
+                uv2 * (1 - sampleWeights.x() - sampleWeights.y());
+    }
+    else
+    {
+        uv = Vector2f(0., 0.);
+    }
 }
 
 /// Return the surface area of the given triangle
+//Seguro? (ni idea de qué estoy haciendo)
 float Mesh::pdf(const Point3f &p) const
 {
-	throw NoriException("Mesh::pdf() is not yet implemented!");	
-	
-	return 0.;
+    return 1.0f / m_pdf.getSum();
 }
 
 

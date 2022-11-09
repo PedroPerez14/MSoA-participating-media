@@ -98,6 +98,8 @@ add_executable(nori
   src/normals.cpp
   src/pointlight.cpp
   src/direct_whitted.cpp
+  #LAB 2
+  src/direct_ems.cpp
 )
 
 add_definitions(${NANOGUI_EXTRA_DEFS})

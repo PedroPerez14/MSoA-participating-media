@@ -6,6 +6,44 @@
 
 #IncludeRegexTransform: 
 
+../ext/filesystem/filesystem/fwd.h
+
+../ext/filesystem/filesystem/path.h
+fwd.h
+../ext/filesystem/filesystem/fwd.h
+algorithm
+-
+string
+-
+vector
+-
+stdexcept
+-
+sstream
+-
+cctype
+-
+cstdlib
+-
+cerrno
+-
+cstring
+-
+windows.h
+-
+ShlObj.h
+-
+unistd.h
+-
+sys/stat.h
+-
+linux/limits.h
+-
+
+../ext/filesystem/filesystem/resolver.h
+path.h
+../ext/filesystem/filesystem/path.h
+
 ../ext/nanogui/ext/eigen/Eigen/Core
 src/Core/util/DisableStupidWarnings.h
 ../ext/nanogui/ext/eigen/Eigen/src/Core/util/DisableStupidWarnings.h
@@ -684,16 +722,10 @@ iostream
 sstream
 -
 
-../include/nori/accel.h
-nori/mesh.h
+../include/nori/bitmap.h
+nori/color.h
 -
-
-../include/nori/bbox.h
-nori/ray.h
--
-
-../include/nori/bsdf.h
-nori/object.h
+nori/vector.h
 -
 
 ../include/nori/color.h
@@ -716,30 +748,8 @@ ImathPlatform.h
 tinyformat.h
 -
 
-../include/nori/dpdf.h
-nori/common.h
--
-
 ../include/nori/emitter.h
 nori/object.h
--
-
-../include/nori/frame.h
-nori/vector.h
--
-
-../include/nori/integrator.h
-nori/object.h
--
-
-../include/nori/mesh.h
-nori/object.h
--
-nori/frame.h
--
-nori/bbox.h
--
-nori/dpdf.h
 -
 
 ../include/nori/object.h
@@ -764,10 +774,6 @@ nori/object.h
 memory
 -
 
-../include/nori/scene.h
-nori/accel.h
--
-
 ../include/nori/transform.h
 nori/common.h
 -
@@ -784,15 +790,15 @@ nori/common.h
 nori/sampler.h
 -
 
-/home/pedro/Escritorio/MRGCV/MSA/Nori2/src/direct_whitted.cpp
-nori/warp.h
--
-nori/integrator.h
--
-nori/scene.h
--
+/home/pedro/Escritorio/MRGCV/MSA/Nori2/src/environment.cpp
 nori/emitter.h
 -
-nori/bsdf.h
+nori/bitmap.h
+-
+nori/warp.h
+-
+filesystem/resolver.h
+-
+fstream
 -
 

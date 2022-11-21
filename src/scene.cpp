@@ -93,11 +93,11 @@ const Emitter * Scene::sampleEmitter(Sampler *sampler, float &pdf, EmitterQueryR
         Color3f rad = m_emitters[i]->sample(lRec, sampler->next2D(), 0.f);
         float maxRadianceCoeff = std::max(std::max(rad.x(), rad.y()), rad.z());
         m_pdf.append(maxRadianceCoeff);
-        m_pdf.normalize();
     }
+    m_pdf.normalize();
     size_t idx = m_pdf.sample(sampler->next1D(), pdf);
     m_pdf.clear();
-    pdf = std::max(Epsilon,pdf);
+    pdf = 1. / std::max(Epsilon,pdf);
     return m_emitters[idx];
 }
 

@@ -53,7 +53,7 @@ public:
         }
         else
         {
-            V = 1.0f;
+            V = 1.0f;   //point lights case
         }
         BSDFQueryRecord bsdfRecord(its.toLocal(-ray.d),
                                 its.toLocal(emitterRecord.wi), its.uv, ESolidAngle);

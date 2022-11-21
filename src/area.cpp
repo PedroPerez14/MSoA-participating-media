@@ -80,9 +80,8 @@ public:
 	virtual float pdf(const EmitterQueryRecord &lRec) const {
 		if (!m_mesh)
 			throw NoriException("There is no shape attached to this Area light!");
-		return lRec.pdf * (pow((lRec.p - lRec.ref).norm(), 2.0f) / (lRec.n.dot(lRec.wi)));	//Comprobar operaciones (mult y div.)
+		return lRec.pdf * (pow((lRec.p - lRec.ref).norm(), 2.0f) / lRec.n.dot(lRec.wi));	//Comprobar operaciones (mult y div.)
 	}
-
 
 	// Get the parent mesh
 	void setParent(NoriObject *parent)

@@ -192,7 +192,6 @@ Vector3f Warp::squareToBeckmann(const Point2f &sample, float alpha)
     Vector3f ret = Vector3f(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
     if(ret.z() < 0)
     {
-        cout << "HEHE" << endl;
         ret = -ret;
     }
     return ret;

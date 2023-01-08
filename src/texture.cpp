@@ -29,6 +29,7 @@ public:
 		m_bitmap = 0;
 
 		m_bitmap_name = props.getString("filename", "null");
+		std::string interpolation_type = props.getString("interpolation", "standard");			//Intento de añadir (no) interpolación closest
 		filesystem::path filename =
 			getFileResolver()->resolve(m_bitmap_name);
 
@@ -37,7 +38,22 @@ public:
 		{
 			cout << "Loading Texture Map: " << filename.str() << endl;
 
-			m_bitmap = new LDRBitmap(filename.str());
+			if(interpolation_type.compare("standard") == 0)
+			{
+				cout << "Using bilinear interpolation!" << endl;
+				m_bitmap = new LDRBitmap(filename.str(), true);
+			}
+			else if(interpolation_type.compare("closest") == 0)
+			{
+				cout << "Using closest interpolation!" << endl;
+				m_bitmap = new LDRBitmap(filename.str(), false);
+			}
+			else
+			{
+				cout << "Using bilinear interpolation!" << endl;
+				m_bitmap = new LDRBitmap(filename.str());
+			}
+				
 			cout << "Loaded " << m_bitmap_name << " - SIZE [" << m_bitmap->rows() << ", " << m_bitmap->cols() << "]" << endl;
 		}
 		m_color = props.getColor("color", Color3f(1.));

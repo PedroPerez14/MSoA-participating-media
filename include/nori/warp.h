@@ -74,6 +74,13 @@ public:
 
     /// Probability density of \ref squareToBeckmann()
     static float squareToBeckmannPdf(const Vector3f &m, float alpha);
+
+
+    /// Añadido para el trabajo final
+    static Vector3f squareToHenyeyGreenstein(const Point2f& sample, float g);
+
+    /// Añadido para el trabajo final
+    static float squareToHenyeyGreensteinPdf(const float &cos_th, float g);
 };
 
 NORI_NAMESPACE_END

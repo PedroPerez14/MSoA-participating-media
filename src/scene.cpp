@@ -30,7 +30,8 @@ NORI_NAMESPACE_BEGIN
 
 Scene::Scene(const PropertyList &) {
     m_accel = new Accel();
-    m_enviromentalEmitter = 0;
+    m_enviromentalEmitter = nullptr;
+    m_enviromentalVolumeMedium = nullptr;
 }
 
 Scene::~Scene() {
@@ -49,6 +50,8 @@ void Scene::activate() {
         if (m_meshes[i]->isEmitter())
             m_emitters.push_back(m_meshes[i]->getEmitter());
             
+
+
     m_accel->build();
     m_pdf.clear();
     m_pdf.reserve(n_emitters);
@@ -62,6 +65,11 @@ void Scene::activate() {
         /* Create a default (independent) sampler */
         m_sampler = static_cast<Sampler*>(
             NoriObjectFactory::createInstance("independent", PropertyList()));
+    }
+    if(!m_enviromentalVolumeMedium)
+    {
+        m_enviromentalVolumeMedium = std::shared_ptr<Volume>(static_cast<Volume*>(NoriObjectFactory::createInstance("volumevdb", PropertyList())));
+        m_enviromentalVolumeMedium->addChild(NoriObjectFactory::createInstance("henyey-greenstein", PropertyList()));
     }
 
     cout << endl;
@@ -128,22 +136,36 @@ void Scene::addChild(NoriObject *obj, const std::string& name) {
 			}
             break;
 
-        case ESampler:
-            if (m_sampler)
-                throw NoriException("There can only be one sampler per scene!");
-            m_sampler = static_cast<Sampler *>(obj);
+        case ESampler: {
+                if (m_sampler)
+                    throw NoriException("There can only be one sampler per scene!");
+                m_sampler = static_cast<Sampler *>(obj);
+            }
             break;
 
         case ECamera:
-            if (m_camera)
+            {
+                if (m_camera)
                 throw NoriException("There can only be one camera per scene!");
-            m_camera = static_cast<Camera *>(obj);
+                m_camera = static_cast<Camera *>(obj);
+            }
             break;
         
-        case EIntegrator:
-            if (m_integrator)
+        case EIntegrator: {
+                if (m_integrator)
                 throw NoriException("There can only be one integrator per scene!");
-            m_integrator = static_cast<Integrator *>(obj);
+                m_integrator = static_cast<Integrator *>(obj);
+            }
+            break;
+
+        case EVolume: {
+                if (m_enviromentalVolumeMedium)
+                {
+                    throw NoriException("There can only be one enviromental volume medium per scene!");
+                }
+                Volume * vol_ptr = static_cast<Volume *>(obj);
+                m_enviromentalVolumeMedium = std::shared_ptr<Volume>(vol_ptr);
+            }
             break;
 
         default:
@@ -171,6 +193,14 @@ std::string Scene::toString() const {
         meshes += "\n";
     }
 
+    std::string volumes;
+    for (size_t i = 0; i < m_volumes.size(); ++i) {
+		volumes += std::string("  ") + indent(m_volumes[i]->toString(), 2);
+		if (i + 1 < m_volumes.size())
+			volumes += ",";
+		volumes += "\n";
+	}
+
 	std::string lights;
 	for (size_t i = 0; i < m_emitters.size(); ++i) {
 		lights += std::string("  ") + indent(m_emitters[i]->toString(), 2);
@@ -187,14 +217,19 @@ std::string Scene::toString() const {
         "  camera = %s,\n"
         "  meshes = {\n"
         "  %s  }\n"
+        "  volumes = {\n"
+        "  %s  }\n"
 		"  emitters = {\n"
 		"  %s  }\n"
+        "  envVolume = %s\n"
         "]",
         indent(m_integrator->toString()),
         indent(m_sampler->toString()),
         indent(m_camera->toString()),
         indent(meshes, 2),
-		indent(lights, 2)
+        indent(volumes, 2),
+		indent(lights, 2),
+        indent(m_enviromentalVolumeMedium->toString())
     );
 }
 

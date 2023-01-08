@@ -211,4 +211,26 @@ float Warp::squareToBeckmannPdf(const Vector3f &m, float alpha)
     
 }
 
+
+/// Añadido para el trabajo final
+Vector3f Warp::squareToHenyeyGreenstein(const Point2f& sample, float g)
+{
+    float cos_th = 1.f - 2.f * sample.x();
+    if(g != 0.f)
+    {
+        cos_th = (1.f / (2.f * g)) * (1.f + pow(g, 2.f) - pow(((1 - pow(g, 2.f)) / (1.f - g + 2.f *  g * sample.x())), 2.f));
+    }
+    float sin_th = std::max(0.f, sqrt(1.f - pow(cos_th, 2.f)));
+    float phi = 2.f * M_PI * sample.y();
+
+    return Vector3f(sin_th * cos(phi), sin_th * sin(phi), cos_th);
+}
+
+/// Añadido para el trabajo final
+float Warp::squareToHenyeyGreensteinPdf(const float &cos_th, float g)
+{
+    float denom_term = sqrt(pow((1.f + pow(g, 2.f) - (2.f * g) * cos_th), 3.f));
+    return (0.25f * INV_PI) * ((1.f - pow(g, 2.f)) / (denom_term));   // (1/4pi) * (... / ...)
+}
+
 NORI_NAMESPACE_END

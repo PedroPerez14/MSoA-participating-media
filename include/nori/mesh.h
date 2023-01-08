@@ -22,6 +22,7 @@
 #include <nori/frame.h>
 #include <nori/bbox.h>
 #include <nori/dpdf.h>
+#include <nori/volume.h>
 
 #ifndef n_UINT
 #define n_UINT uint32_t
@@ -153,11 +154,21 @@ public:
     /// Is this mesh an area emitter?
     bool isEmitter() const { return m_emitter != nullptr; }
 
+    /// Is this mesh a volume?
+    /// Añadido para el trabajo final
+    bool isVolume() const { return m_volume != nullptr; }
+
     /// Return a pointer to an attached area emitter instance
     Emitter *getEmitter() { return m_emitter; }
 
     /// Return a pointer to an attached area emitter instance (const version)
     const Emitter *getEmitter() const { return m_emitter; }
+
+    /// Return a pointer to an attached volume
+    std::shared_ptr<Volume> getVolume() { return m_volume; }
+
+    /// Return a pointer to an attached volume (const version)
+    const std::shared_ptr<Volume> getVolume() const { return m_volume; }
 
     /// Return a pointer to the BSDF associated with this mesh
     const BSDF *getBSDF() const { return m_bsdf; }
@@ -191,6 +202,9 @@ protected:
     Emitter      *m_emitter = nullptr;   ///< Associated emitter, if any
     BoundingBox3f m_bbox;                ///< Bounding box of the mesh
     DiscretePDF  m_pdf;                  ///< Discrete pdf for sampling triangles uniformly wrt their area. 
+    //Añadido para el trabajo final
+    /// TODO: Modificar esto (seguramente) para cuando cargue los .vdb 
+    std::shared_ptr<Volume> m_volume = nullptr;   ///< Associated volume, if any
 };
 
 NORI_NAMESPACE_END

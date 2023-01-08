@@ -76,7 +76,16 @@ public:
     /// Load a PNG file with the specified filename
     LDRBitmap(const std::string& filename);
 
+    /// Load a PNG file with the specified filename
+    LDRBitmap(const std::string& filename, 
+    const bool& use_linear_interpolation);
+
     Color3f eval(const Point2f& uv) const;
+
+private:
+    Color3f eval_bilinear_interp(const Point2f& uv) const;
+    Color3f eval_closest_interp(const Point2f& uv) const;
+    bool m_use_linear_interpolation;
 };
 
 NORI_NAMESPACE_END

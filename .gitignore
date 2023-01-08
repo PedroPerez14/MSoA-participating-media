@@ -2,3 +2,14 @@ build/**
 .vscode/**
 scenes/**
 .*/
+cmake-build-*/**
+ext/nanogui/docs/make.bat
+ext/tbb/build/generate_tbbvars.bat
+ext/tbb/build/test_launcher.bat
+ext/tbb/examples/common/copy_libraries.bat
+ext/tbb/examples/common/gui/dxcheck.bat
+ext/tbb/examples/parallel_for/tachyon/msvs/win8ui/copy_libraries_and_assets.bat
+ext/zlib/make_vms.com
+ext/zlib/contrib/masmx64/bld_ml64.bat
+ext/zlib/contrib/masmx86/bld_ml32.bat
+ext/zlib/contrib/minizip/make_vms.com

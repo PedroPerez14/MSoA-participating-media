@@ -164,6 +164,7 @@ Color3f Bitmap::eval(const Point2f& uv) const
 
 LDRBitmap::LDRBitmap(const std::string& filename)
 {
+    m_use_linear_interpolation = true;
     int x,y,n;
     unsigned char *im = stbi_load(filename.c_str(), &x, &y, &n, 3);
     
@@ -180,9 +181,29 @@ LDRBitmap::LDRBitmap(const std::string& filename)
     stbi_image_free(im);
 }
 
-Color3f LDRBitmap::eval(const Point2f& uv) const
+LDRBitmap::LDRBitmap(const std::string& filename, const bool& use_linear_interpolation)
 {
-    float x = (1.f - uv[0]) * cols();;
+    m_use_linear_interpolation = use_linear_interpolation;
+    int x,y,n;
+    unsigned char *im = stbi_load(filename.c_str(), &x, &y, &n, 3);
+    
+    if(!im)
+        throw NoriException("Failed opening Bitmap");
+
+    resize(y, x);
+
+    cout << "Reading a " << cols() << "x" << rows() << " LDR file from \""
+        << filename << "\"" << endl;
+
+    memcpy((void*)this->data(), (void*)im, y * x * 3 * sizeof(uint8_t));
+    
+    stbi_image_free(im);
+}
+
+
+Color3f LDRBitmap::eval_bilinear_interp(const Point2f& uv) const
+{
+    float x = (1.f - uv[0]) * cols();
     float y = (1.f - uv[1]) * rows();
 
     int ix = x, iy = y;
@@ -200,8 +221,36 @@ Color3f LDRBitmap::eval(const Point2f& uv) const
 
     Color3f color = ((1.f - wx) * (1.f - wy)) * coeff(iy, ix).cast<float>() + (wx * (1.f - wy)) * coeff(iy, ix1).cast<float>()
                   + ((1.f - wx) * wy) * coeff(iy1, ix).cast<float>() + (wx * wy) * coeff(iy1, ix1).cast<float>();
+}
 
+Color3f LDRBitmap::eval_closest_interp(const Point2f& uv) const
+{
+    float x = (1.f - uv[0]) * cols();
+    float y = (1.f - uv[1]) * rows();
+
+    int ix = x, iy = y;
+
+    // Only warp suported is repeat
+    if (ix >= cols() || ix < 0) ix = ix % cols();
+    if (iy >= rows() || iy < 0) iy = iy % rows();
+
+    Color3f color = coeff(iy, ix).cast<float>();
+    
     return color / 255.f;
+}
+
+Color3f LDRBitmap::eval(const Point2f& uv) const
+{
+    Color3f color(0.f);
+    if(m_use_linear_interpolation)
+    {
+        return eval_bilinear_interp(uv);
+    }
+    else
+    {
+        return eval_closest_interp(uv);
+    }
+    //Maybe an enum can help here instead of a bool, but anyway
 }
 
 

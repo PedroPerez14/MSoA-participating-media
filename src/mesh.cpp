@@ -25,6 +25,7 @@
 #include <nori/bsdf.h>
 #include <nori/emitter.h>
 #include <nori/warp.h>
+#include <nori/volume.h>
 #include <Eigen/Geometry>
 
 NORI_NAMESPACE_BEGIN
@@ -45,7 +46,7 @@ void Mesh::activate() {
     }
     m_pdf.reserve(m_F.cols());
 
-    for(size_t i = 0; i < m_F.cols(); i++)
+    for(size_t i = 0; i < (size_t)m_F.cols(); i++)
     {
         float area = surfaceArea((n_UINT) i);
         m_pdf.append(area);
@@ -124,9 +125,8 @@ Point3f Mesh::getCentroid(n_UINT index) const {
  */
 void Mesh::samplePosition(const Point2f &sample, Point3f &p, Normal3f &n, Point2f &uv) const
 {
-    //TODO REVISAR MUCHO
     float sampleUpdate(sample.x());
-    n_UINT index = m_pdf.sampleReuse(sampleUpdate);   //This will change later in the assignment, creo? //TODO
+    n_UINT index = m_pdf.sampleReuse(sampleUpdate);
     n_UINT i0 = m_F(0, index), i1 = m_F(1, index), i2 = m_F(2, index);
     Point3f p0 = m_V.col(i0), p1 = m_V.col(i1), p2 = m_V.col(i2);
     Point2f sampleWeights = Warp::squareToUniformTriangle(Point2f(sampleUpdate, sample.y()));
@@ -140,7 +140,7 @@ void Mesh::samplePosition(const Point2f &sample, Point3f &p, Normal3f &n, Point2
     if(m_N.size() > 0)    //If we have vertex normals data
     {
         Point3f n0 = m_N.col(i0), n1 = m_N.col(i1), n2 = m_N.col(i2);
-        n = -(n0 * sampleWeights.x() + n1 * sampleWeights.y() +
+        n = (n0 * sampleWeights.x() + n1 * sampleWeights.y() +
                 n2 * (1 - sampleWeights.x() - sampleWeights.y()));
         n.normalize();
     }
@@ -148,7 +148,7 @@ void Mesh::samplePosition(const Point2f &sample, Point3f &p, Normal3f &n, Point2
     {
         /* Find vectors for two edges sharing v[0] */
         Vector3f edge1 = p1 - p0, edge2 = p2 - p0;
-        n = -edge1.cross(edge2);
+        n = edge1.cross(edge2);
         n.normalize();
     }
 
@@ -175,24 +175,43 @@ float Mesh::pdf(const Point3f &p) const
 void Mesh::addChild(NoriObject *obj, const std::string& name) {
     switch (obj->getClassType()) {
         case EBSDF:
+        {
             if (m_bsdf)
                 throw NoriException(
                     "Mesh: tried to register multiple BSDF instances!");
             m_bsdf = static_cast<BSDF *>(obj);
             break;
+        }
+            
 
-        case EEmitter: {
-                Emitter *emitter = static_cast<Emitter *>(obj);
-                if (m_emitter)
-                    throw NoriException(
-                        "Mesh: tried to register multiple Emitter instances!");
-                m_emitter = emitter;
-            }
+        case EEmitter:
+        {
+            Emitter *emitter = static_cast<Emitter *>(obj);
+            if (m_emitter)
+                throw NoriException(
+                    "Mesh: tried to register multiple Emitter instances!");
+            m_emitter = emitter;
             break;
+        }
+            
+
+        //Añadido para el trabajo final
+        case EVolume:
+        {
+            if(m_volume)
+            {
+                throw NoriException("Mesh: Tried to register multiple Volume instances!");
+            }
+            Volume *_volume = static_cast<Volume *>(obj);
+            m_volume = std::shared_ptr<Volume>(_volume);
+            break;
+        }
+            
 
         default:
             throw NoriException("Mesh::addChild(<%s>) is not supported!",
                                 classTypeName(obj->getClassType()));
+            break;
     }
 }
 

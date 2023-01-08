@@ -48,7 +48,7 @@ public:
 		if (!m_mesh)
 			throw NoriException("There is no shape attached to this Area light!");
 
-		if(lRec.n.dot(lRec.wi) > 0.0f)		//if not backfacing
+		if(lRec.n.dot(lRec.wi) <= 0.0f)		//if not backfacing
 		{
 			return m_radiance->eval(lRec.uv);	//Comprobar operaciones (mult y div.)
 		}
@@ -67,7 +67,6 @@ public:
         lRec.dist = (lRec.p - lRec.ref).norm();
         lRec.wi = (lRec.p - lRec.ref) / lRec.dist;	//OJO QUE NO ESTÉ DADO LA VUELTA
         lRec.pdf = m_mesh->pdf(Point3f(sample.x(), sample.y(), 0.));
-
         // Note that here it is assumed perfect visibility; this means
         // that visibility should be taken care of in the integrator.
         return eval(lRec) / pdf(lRec);		//Comprobar operaciones (mult y div.)
@@ -80,7 +79,7 @@ public:
 	virtual float pdf(const EmitterQueryRecord &lRec) const {
 		if (!m_mesh)
 			throw NoriException("There is no shape attached to this Area light!");
-		return lRec.pdf * (pow((lRec.p - lRec.ref).norm(), 2.0f) / lRec.n.dot(lRec.wi));	//Comprobar operaciones (mult y div.)
+		return lRec.pdf * (pow(lRec.dist, 2.0f) / abs(lRec.n.dot(lRec.wi)));	//Comprobar operaciones (mult y div.)
 	}
 
 	// Get the parent mesh

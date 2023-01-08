@@ -64,6 +64,9 @@ public:
 	/// Return a reference to an array containing all lights
 	const std::vector<Emitter *> &getLights() const { return m_emitters; }
 
+    /// Return a reference to an array containing all volumes
+	const std::vector<std::shared_ptr<Volume>> &getVolumes() const { return m_volumes; }
+
 	/// Return a the scene background
 	Color3f getBackground(const Ray3f& ray) const;
 
@@ -81,6 +84,10 @@ public:
 	{
 		return m_enviromentalEmitter;
 	}
+
+    const std::shared_ptr<Volume> getEnviromentalVolumeMedium() const{
+        return m_enviromentalVolumeMedium;
+    }
 
     /**
      * \brief Intersect a ray against all triangles stored in the scene
@@ -143,7 +150,9 @@ public:
 private:
     std::vector<Mesh *> m_meshes;
 	std::vector<Emitter *> m_emitters;
+	std::vector<std::shared_ptr<Volume>> m_volumes;
 	Emitter *m_enviromentalEmitter = nullptr;
+    std::shared_ptr<Volume> m_enviromentalVolumeMedium;
 	
     Integrator *m_integrator = nullptr;
     Sampler *m_sampler = nullptr;

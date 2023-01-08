@@ -45,7 +45,7 @@ public:
 
 
         pmat_wem = its.mesh->getBSDF()->pdf(mqr_aux);   //puta mierda casi seguro
-        pem_wmat = scene->pdfEmitter(eqr_aux.emitter) * lightpdf;                           //LE FALTA PESO A MATS       
+        pem_wmat = scene->pdfEmitter(eqr_aux.emitter) * lightpdf;                           //LE FALTA(ba) PESO A MATS       
         //pem_wmat = eqr_aux.emitter->pdf(eqr_aux) / scene->pdfEmitter(eqr_aux.emitter); //puta mierda seguro 100% //SI ECUENTRO LUZ, 1/N * PROB DE SAMPLEAR EL PUNTO QUE HE PILLADO DE LA LUZ
         //pem_wmat = (emitterRecord.pdf * (pow((eqr_aux.p - eqr_aux.ref).norm(), 2.0f) / eqr_aux.n.dot(eqr_aux.wi))) / scene->pdfEmitter(eqr_aux.emitter); //puta mierda seguro 100% //SI ECUENTRO LUZ, 1/N * PROB DE SAMPLEAR EL PUNTO QUE HE PILLADO DE LA LUZ
         
@@ -60,18 +60,7 @@ public:
         if(pmat_wmat != 0.)
         {
             w_bsdfSampling = pmat_wmat / (pem_wmat + pmat_wmat);
-        }
-
-        //cout << "EMITTER: " << Color3f(w_emitterSampling * mis_emitterSampling).toString() << " BSDF" << Color3f(w_bsdfSampling * mis_bsdfSampling).toString() << endl;
-        /*if(sampler->next1D() > 0.999f)
-        {
-            cout << "W_EMITTER: " << w_emitterSampling << endl;
-            cout << "W_MATS: " << w_bsdfSampling << endl;
-            //cout << "MIS_EMITTER" << mis_emitterSampling.toString() << endl;
-        }*/
-
-        //DistanceSquared(ref.p, isectLight.p) / (AbsDot(isectLight.n, -wi) * Area());  //?????
-        
+        }        
         return Lo + (w_emitterSampling * mis_emitterSampling) + (w_bsdfSampling * mis_bsdfSampling);
     }
 

@@ -3,6 +3,11 @@ project(nori)
 
 add_subdirectory(ext ext_build)
 
+find_library(OPENVDB_LIB openvdb) #Añaiddo
+add_library(openvdb SHARED IMPORTED GLOBAL)
+set_property(TARGET openvdb PROPERTY IMPORTED_LOCATION ${OPENVDB_LIB})
+set_property(TARGET openvdb APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
 include_directories(
   # Nori include files
   ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -33,6 +38,7 @@ include_directories(
   SYSTEM ${FILESYSTEM_INCLUDE_DIR}
   # STB Image Write
   SYSTEM ${STB_IMAGE_WRITE_INCLUDE_DIR}
+
 )
 
 # The following lines build the main executable. If you add a source
@@ -70,6 +76,7 @@ add_executable(nori
   # TODO Trabajo final
   include/nori/phasefunction.h
   include/nori/volume.h
+  include/nori/volumedatabase.h
 
   # Source code files
   src/accel.cpp
@@ -109,8 +116,10 @@ add_executable(nori
   # TODO trabajo final
   src/path_mis_participating.cpp
   src/henyey_greenstein.cpp
+  src/rayleigh.cpp
   src/volume_vdb.cpp
   #src/volume_procedural.cpp
+  src/volumedatabase.cpp
 )
 
 add_definitions(${NANOGUI_EXTRA_DEFS})
@@ -127,10 +136,11 @@ add_executable(warptest
   src/reflectance.cpp
 )
 
+
 if (WIN32)
-  target_link_libraries(nori tbb_static pugixml IlmImf nanogui ${NANOGUI_EXTRA_LIBS} zlibstatic)
+  target_link_libraries( nori  tbb_static pugixml IlmImf openvdb nanogui ${NANOGUI_EXTRA_LIBS} zlibstatic )
 else()
-  target_link_libraries(nori tbb_static pugixml IlmImf nanogui ${NANOGUI_EXTRA_LIBS})
+  target_link_libraries( nori  tbb_static  pugixml IlmImf openvdb nanogui ${NANOGUI_EXTRA_LIBS}  )
 endif()
 
 target_link_libraries(warptest tbb_static nanogui ${NANOGUI_EXTRA_LIBS})

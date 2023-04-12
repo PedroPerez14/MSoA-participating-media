@@ -229,8 +229,27 @@ Vector3f Warp::squareToHenyeyGreenstein(const Point2f& sample, float g)
 /// Añadido para el trabajo final
 float Warp::squareToHenyeyGreensteinPdf(const float &cos_th, float g)
 {
+    if(g == 0.f)
+            return 1.f / (4.f * M_PI); 
     float denom_term = sqrt(pow((1.f + pow(g, 2.f) - (2.f * g) * cos_th), 3.f));
     return (0.25f * INV_PI) * ((1.f - pow(g, 2.f)) / (denom_term));   // (1/4pi) * (... / ...)
 }
+
+Vector3f Warp::squareToRayleigh(const Point2f& sample)
+{
+    float cos_th = 2.f * sample.x() - 1.f;
+    float sin_th = std::max(0.f, sqrt(1.f - (cos_th * cos_th)));
+    float phi = 2.f * M_PI * sample.y();
+
+    return Vector3f(sin_th * cos(phi), sin_th * sin(phi), cos_th);
+}
+
+/// Añadido
+float Warp::squareToRayleighPdf(const Vector3f& v)
+{
+    return 1.0f / (2.0f * M_PI);
+}
+
+
 
 NORI_NAMESPACE_END

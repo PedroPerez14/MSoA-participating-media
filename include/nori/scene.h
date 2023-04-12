@@ -70,6 +70,9 @@ public:
 	/// Return a the scene background
 	Color3f getBackground(const Ray3f& ray) const;
 
+    // Uniformly sample a volume 
+    const std::shared_ptr<Volume> sampleVolume(Sampler* sampler, std::vector<std::shared_ptr<Volume>> vols, float& pdf) const;
+
 	/// Sample emitter
 	const Emitter *sampleEmitter(float rnd, float &pdf) const;
 
@@ -106,6 +109,26 @@ public:
     bool rayIntersect(const Ray3f &ray, Intersection &its) const {
         return m_accel->rayIntersect(ray, its, false);
     }
+
+    /**
+     * \brief Intersect a ray against all non-volumetric geometries 
+     * stored in the scene and generating a list of intersections 
+     * with the volumes it encountered along its way
+     *
+     * \param ray
+     *    A 3-dimensional ray data structure with minimum/maximum
+     *    extent information
+     *
+     * \param segs
+     *    Segments of the path, divided by volumetric interactions
+     *
+     * \return \c true if an intersection with a non-volumetric mesh was found
+     */
+    bool rayIntersectThroughVolumes(Sampler* sampler, const Ray3f &ray, const Point3f& xt, Intersection& its_out, std::shared_ptr<Volume> startVol, std::vector<VolumetricSegmentRecord>& segs) const;
+
+    bool rayIntersectThroughVolumes(Sampler* sampler, const Ray3f &ray, Intersection& its_out, std::shared_ptr<Volume> startVol, std::vector<VolumetricSegmentRecord>& segs) const;
+
+    bool shadowRayThroughVolumes(Sampler* sampler, const Ray3f& sray, std::shared_ptr<Volume> startVol, std::vector<VolumetricSegmentRecord>& segs_shadow, float& t) const;
 
     /**
      * \brief Intersect a ray against all triangles stored in the scene

@@ -49,6 +49,10 @@ void Scene::activate() {
     for(unsigned int i=0; i<m_meshes.size(); ++i )
         if (m_meshes[i]->isEmitter())
             m_emitters.push_back(m_meshes[i]->getEmitter());
+
+    for(unsigned int i=0; i<m_meshes.size(); ++i )
+        if (m_meshes[i]->isVolume())
+            m_volumes.push_back(m_meshes[i]->getVolume());
             
 
 
@@ -84,6 +88,285 @@ const Emitter * Scene::sampleEmitter(float rnd, float &pdf) const {
 	pdf = 1. / float(n);
 	return m_emitters[index];
 }
+
+/// Intersect a ray that traverses the volumes, storing info about those interactions.
+bool Scene::rayIntersectThroughVolumes(Sampler* sampler, const Ray3f &ray, const Point3f& xt, Intersection& its_out, std::shared_ptr<Volume> startVol, std::vector<VolumetricSegmentRecord>& segs) const
+{
+    //std::cout << "THROUGH VOLUMES XT: " << ray.o.x() << " " << ray.o.y() << " " << ray.o.z() << " " << xt.x() << " " << xt.y() << " " << xt.z() << std::endl;
+    bool done = false;
+    std::vector<std::shared_ptr<Volume>> volumes_traversed;
+    volumes_traversed.reserve(m_volumes.size());
+    volumes_traversed.push_back(startVol);
+    Ray3f _ray(ray.o, ray.d);
+    int n_bounces = 0;
+    while(true)
+    {
+        if(n_bounces > 100)
+        {
+            std::cout << "rayIntersectThroughVolumes(): Too many bounces. Is everything alright? Aborting..." << std::endl;
+            return false;
+        }
+        n_bounces++;        //I could put this here or before every continue, this one's easier though
+
+        Intersection its;
+        bool intersects = rayIntersect(_ray, its);
+        // If we haven´t found the final point of our ray (either xt or its.p)
+        if(!done)
+        {   
+            if(intersects)
+            {
+                float t = (xt - _ray.o).norm();
+                float z = (its.p - _ray.o).norm();
+                if(its.mesh->isVolume())
+                {
+                    
+                    /// Now we choose one volume from the ones we are currently traversing
+                    ///     This is done uniformly (for now), if none traversed, return envVolume
+                    float volume_pdf;
+                    std::shared_ptr<Volume> sampled_vol = sampleVolume(sampler, volumes_traversed, volume_pdf);
+
+                    if(t <= z)
+                    {
+                        VolumetricSegmentRecord vsr(_ray.o, xt, sampled_vol, volume_pdf);
+                        //ISNAN
+                        std::cout << "_XT_INTER_T_LEQ_Z: " << vsr.xs << std::endl;
+                        segs.push_back(vsr);
+                        Vector3f dir = _ray.d;
+                        _ray = Ray3f(xt, dir);
+                        done = true;
+                    }
+                    else
+                    {
+                        VolumetricSegmentRecord vsr(_ray.o, its.p, sampled_vol, volume_pdf);
+                        //ISNAN
+                        std::cout << "_XT_INTER_T_GT_Z: " << vsr.xs << std::endl;
+                        segs.push_back(vsr);
+                        Vector3f dir = _ray.d;
+                        _ray = Ray3f(its.p, dir);
+                    }
+                    // Add the volume to our "currently traversed" list if we aren't already traversing it
+                    // If we are, remove it from the list, because we have just got out of it
+                    auto iter = std::find(volumes_traversed.begin(), volumes_traversed.end(), its.mesh->getVolume());
+                    if(iter != volumes_traversed.end())
+                    {
+                        volumes_traversed.erase(iter);
+                    }
+                    else
+                    {
+                        volumes_traversed.push_back(its.mesh->getVolume());
+                    }
+                    continue;
+                }
+                else
+                {
+                    float volume_pdf;
+                    std::shared_ptr<Volume> sampled_vol = sampleVolume(sampler, volumes_traversed, volume_pdf);
+
+                    if(t <= z)
+                    {
+                        VolumetricSegmentRecord vsr(_ray.o, xt, sampled_vol, volume_pdf);
+                        //ISNAN
+                        std::cout << "_XT_INTER_NOVOL_T_LEQ_Z: " << vsr.xs << std::endl;
+                        segs.push_back(vsr);
+                    }
+                    else
+                    {
+                        VolumetricSegmentRecord vsr(_ray.o, its.p, sampled_vol, volume_pdf);
+                        //ISNAN
+                        std::cout << "_XT_INTER_NOVOL_T_GT_Z: " << vsr.xs << std::endl;
+                        segs.push_back(vsr);
+                    }
+                    its_out = its;
+                    its_out.t = t;
+                    return true;
+                }
+            }
+            else
+            {
+                float volume_pdf;
+                std::shared_ptr<Volume> sampled_vol = m_enviromentalVolumeMedium;//sampleVolume(sampler, volumes_traversed, volume_pdf);
+
+                VolumetricSegmentRecord vsr(_ray.o, xt, sampled_vol, volume_pdf);
+                //ISNAN
+                std::cout << "_XT_NOINTER: " << vsr.xs << std::endl;
+                segs.push_back(vsr);
+                return false;
+            }
+        }
+        else
+        {
+            if(intersects)
+            {
+                if(its.mesh->isVolume())
+                {
+                    //continue, cambiar _ray???
+                    _ray = Ray3f(its.p, ray.d);
+                    continue;
+                }
+                else
+                {
+                    ///TODO: VERY SUS
+                    its_out = its;
+                    return true;
+                }
+            }
+            else
+            {
+                return false;
+            }
+        }
+    }
+}
+
+const std::shared_ptr<Volume> Scene::sampleVolume(Sampler* sampler, std::vector<std::shared_ptr<Volume>> vols, float& pdf) const
+{
+    if(vols.size() == 0)
+    {
+        pdf = 1.f;
+        return m_enviromentalVolumeMedium;
+    }
+    //else
+    auto const & n = vols.size();
+	size_t index = std::min(static_cast<size_t>(std::floor(n*sampler->next1D())), n - 1);
+	pdf = 1. / float(n);
+	return vols[index];
+}
+
+// Alternative version, without xt
+bool Scene::rayIntersectThroughVolumes(Sampler* sampler, const Ray3f &ray, Intersection& its_out, std::shared_ptr<Volume> startVol, std::vector<VolumetricSegmentRecord>& segs) const
+{
+    bool done = false;
+    std::vector<std::shared_ptr<Volume>> volumes_traversed;
+    volumes_traversed.reserve(m_volumes.size());
+    volumes_traversed.push_back(startVol);
+    Ray3f _ray(ray);
+    int n_bounces = 0;
+    while(true)
+    {
+        if(n_bounces > 100)
+        {
+            std::cout << "rayIntersectThroughVolumes(no xt): Too many bounces. Is everything alright? Aborting..." << std::endl;
+            return false;
+        }
+        n_bounces++;
+
+
+        Intersection its;
+        bool intersects = rayIntersect(_ray, its);
+        // If we haven´t found the final point of our ray (either xt or its.p)
+        if(intersects)
+        {
+            // float t = (xt - _ray.o).norm();
+            // float z = (its.p - _ray.o).norm();
+            if(its.mesh->isVolume())
+            {
+                /// Now we choose one volume from the ones we are currently traversing
+                ///     This is done uniformly (for now), if none traversed, return envVolume
+                float volume_pdf;
+                std::shared_ptr<Volume> sampled_vol = sampleVolume(sampler, volumes_traversed, volume_pdf);
+                VolumetricSegmentRecord vsr(_ray.o, its.p, sampled_vol, volume_pdf);
+                //ISNAN
+                std::cout << "_NO_XT_INTER_VOL: " << vsr.xs << std::endl;
+                segs.push_back(vsr);
+                Vector3f dir = _ray.d;
+                _ray = Ray3f(its.p, dir);
+
+                // Add the volume to our "currently traversed" list if we aren't already traversing it
+                // If we are, remove it from the list, because we have just got out of it
+                auto iter = std::find(volumes_traversed.begin(), volumes_traversed.end(), its.mesh->getVolume());
+                if(iter != volumes_traversed.end())
+                {
+                    volumes_traversed.erase(iter);
+                }
+                else
+                {
+                    volumes_traversed.push_back(its.mesh->getVolume());
+                }
+
+                continue;
+            }
+            else
+            {
+                float volume_pdf;
+                std::shared_ptr<Volume> sampled_vol = sampleVolume(sampler, volumes_traversed, volume_pdf);
+                VolumetricSegmentRecord vsr(_ray.o, its.p, sampled_vol, volume_pdf);
+                //ISNAN
+                std::cout << "_NO_XT_INTER_NOVOL: " << vsr.xs << std::endl;
+                segs.push_back(vsr);
+                its_out = its;
+                return true;
+            }
+        }
+        else
+        {
+            float volume_pdf;
+            std::shared_ptr<Volume> sampled_vol = m_enviromentalVolumeMedium;//sampleVolume(sampler, volumes_traversed, volume_pdf);
+
+            VolumetricSegmentRecord vsr(_ray.o, _ray.o + ray.d * 1.f, sampled_vol, volume_pdf);
+            //ISNAN
+            //std::cout << "KAMEHAMEHA: " << vsr.xs << std::endl;
+            std::cout << "_NO_XT_NOINTER: " << vsr.xs << std::endl;
+            segs.push_back(vsr);
+            return false;
+        }
+    }
+}
+
+
+bool Scene::shadowRayThroughVolumes(Sampler* sampler, const Ray3f& sray, std::shared_ptr<Volume> startVol, std::vector<VolumetricSegmentRecord>& segs_shadow, float& t) const
+{
+    t = 0.0f;
+    std::vector<std::shared_ptr<Volume>> volumes_traversed;
+    volumes_traversed.reserve(m_volumes.size());
+    volumes_traversed.push_back(startVol);
+    Ray3f ray(sray);
+    int n_bounces = 0;
+    while(true)
+    {
+        if(n_bounces > 100)
+        {
+            std::cout << "rayIntersectThroughVolumes(no xt): Too many bounces. Is everything alright? Aborting..." << std::endl;
+            return false;
+        }
+        n_bounces++;        //I could put this here or before every continue, this one's easier though
+
+        Intersection its;
+        bool intersects = rayIntersect(ray, its);
+        if(!intersects)
+        {
+            float volume_pdf;
+            std::shared_ptr<Volume> sampled_vol = sampleVolume(sampler, volumes_traversed, volume_pdf);
+
+            VolumetricSegmentRecord vsr(ray.o, ray.o + ray.d * 1.f, sampled_vol, volume_pdf);
+            std::cout << "_SHRAY_NO_INTER: " << vsr.xs << std::endl;
+            segs_shadow.push_back(vsr);
+            t += its.t;
+            return false;
+        }
+        else
+        {
+            if(its.mesh->isVolume())
+            {
+                float volume_pdf;
+                std::shared_ptr<Volume> sampled_vol = sampleVolume(sampler, volumes_traversed, volume_pdf);
+                VolumetricSegmentRecord vsr(ray.o, its.p, sampled_vol, volume_pdf);
+                t += its.t;
+                ray = Ray3f(its.p, ray.d);
+            }
+            else
+            {
+                float volume_pdf;
+                std::shared_ptr<Volume> sampled_vol = sampleVolume(sampler, volumes_traversed, volume_pdf);
+                VolumetricSegmentRecord vsr(ray.o, its.p, sampled_vol, volume_pdf);
+                t += its.t;
+                return true;
+            }
+        }
+    }
+}
+
+
+
 
 /// Sample emitter with importance sampling
 const Emitter * Scene::sampleEmitter(Sampler *sampler, float &pdf, EmitterQueryRecord lRec) const {

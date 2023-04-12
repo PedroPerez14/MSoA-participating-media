@@ -23,13 +23,13 @@ public:
     HenyeyGreenstein()
     {
         g = 0.f;
-        mu_s = Color3f(0.05f);
+        mu_s = Color3f(0.0f);
     }
 
     HenyeyGreenstein(const PropertyList &propList) {
         //m_albedo = new ConstantSpectrumTexture(propList.getColor("albedo", Color3f(0.5f)));
         g = float(propList.getFloat("g", 0.f));
-        mu_s = Color3f(propList.getColor("mu_s", Color3f(0.05f)));
+        mu_s = Color3f(propList.getColor("mu_s", Color3f(0.f)));
     }
 
     ~HenyeyGreenstein()
@@ -42,6 +42,9 @@ public:
     {
         //WARNING: This assumes that you have already sampled a direction !!!!
         //          Call sample() before calling this !!!!1!
+        if(g == 0.f)
+            return 1 / (4.f * M_PI); 
+
         float cos_th = pRec.wi.dot(pRec.wo); 
         float denom_term = sqrt(pow((1.f + pow(g, 2.f) - (2.f * g) * cos_th), 3.f));
         return (0.25f * INV_PI) * ((1.f - pow(g, 2.f)) / (denom_term));   // (1/4pi) * (... / ...)
@@ -58,7 +61,7 @@ public:
     float sample(PFQueryRecord &pRec, const Point2f &sample) const
     {
         //TODO ME HE QUEDADO AQUÍ
-        pRec.wo = Warp::squareToHenyeyGreenstein(sample, get_g());
+        pRec.wo = Warp::squareToHenyeyGreenstein(sample, g);
         float retVal = eval(pRec);
         pRec.m_pdf = pdf(pRec);
         //std::cout << "WO: " << pRec.wo.toString() << std::endl;

@@ -103,6 +103,7 @@ public:
                 }
             }
         }
+        cout << "Bounding box of the mesh " << m_name << " is " << m_bbox.min.x() << " " << m_bbox.min.y() << " " << m_bbox.min.z() << " " << m_bbox.max.x() << " " << m_bbox.max.y() << " " << m_bbox.max.z() << std::endl;
         cout << "End reading \"" << filename << "\" .. ";
 
 

@@ -81,6 +81,13 @@ public:
 
     /// Añadido para el trabajo final
     static float squareToHenyeyGreensteinPdf(const float &cos_th, float g);
+
+    /// Añadido
+    static Vector3f squareToRayleigh(const Point2f& sample);
+
+    // Añadido
+    static float squareToRayleighPdf(const Vector3f& v);
+
 };
 
 NORI_NAMESPACE_END

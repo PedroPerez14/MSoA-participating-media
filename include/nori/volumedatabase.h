@@ -23,7 +23,9 @@ class Volumedatabase {
 
         Color3f sample_density(const Point3f& pos_world);
 
-        Color3f ratioTracking(const Point3f& x0, const Point3f& xz, const float& mu_t);
+        Point3f samplePathStep(const Ray3f& ray, const Intersection& its, Sampler* sampler, const Color3f& mu_s, const Color3f& mu_t, Color3f& _beta, bool& sampledMedium);
+
+        Color3f ratioTracking(Sampler* sampler, const Point3f& x0, const Point3f& xz, const float& mu_t);
 
     private:
 

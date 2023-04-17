@@ -60,7 +60,6 @@ public:
     /// Draw a a sample from the BRDF model
     float sample(PFQueryRecord &pRec, const Point2f &sample) const
     {
-        //TODO ME HE QUEDADO AQUÍ
         pRec.wo = Warp::squareToHenyeyGreenstein(sample, g);
         float retVal = eval(pRec);
         pRec.m_pdf = pdf(pRec);

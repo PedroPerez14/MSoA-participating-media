@@ -8,6 +8,7 @@
 */
 
 #include <nori/volume.h>
+#include <nori/mesh.h>
 #include <nori/volumedatabase.h>
 
 NORI_NAMESPACE_BEGIN
@@ -79,87 +80,82 @@ public:
     }
 
 
-    Point3f samplePathStep(const Point3f& x, const Point3f& xz, const Vector3f& dir, 
-                const Vector2f& sample, float& pdf_success, float& pdf_failure) const
+    Point3f samplePathStep(const Ray3f& ray, const Intersection& its, Sampler*& sampler, Color3f& _beta, std::shared_ptr<Volume>& nextVolume, std::shared_ptr<Volume>& currentVolume, bool& sampledMedium) const
     {
+        //If our medium is homogeneous, it's easier
         if(!m_heterogeneous)
         {
-            float _mu_t = sample_mu_t(x).sum() / 3.f;
-            float t = -log(1.f - sample.y()) / _mu_t;
-            float spectrum_mu_t = sample_mu_t(x).x();
-            float tmp = exp(-spectrum_mu_t * t);
-            pdf_failure += tmp;
-            pdf_success += spectrum_mu_t * tmp;
+            Point3f sampled_point;
+            int channel = std::min(static_cast<int>(std::floor(3 * sampler->next1D())), 2);
 
-            spectrum_mu_t = sample_mu_t(x).y();
-            tmp = exp(-spectrum_mu_t * t);
-            pdf_failure += tmp;
-            pdf_success += spectrum_mu_t * tmp;
+            /// We compute a t and check if it is medium interaction or surface interaction
+            //Since this is a homogeneous medium the point we pass here is irrelevant
+            float _mu_t = sample_mu_t(Point3f(0.f))[channel];
+            float dist = -std::log(1.f - sampler->next1D()) / _mu_t;
+            float t = std::min(dist * ray.d.norm(), its.t);
+            sampledMedium = t < its.t;
+            nextVolume = currentVolume;
 
-            spectrum_mu_t = sample_mu_t(x).z();
-            tmp = exp(-spectrum_mu_t * t);
-            pdf_failure += tmp;
-            pdf_success += spectrum_mu_t * tmp;
+            if(!sampledMedium && its.mesh->isVolume())
+            {
+                nextVolume = its.mesh->getVolume();
+            }
 
-            pdf_failure /= 3.f;
-            pdf_success /= 3.f;
+            sampled_point = ray(t);
 
-            if(isnan(x.z()))
-                std::cout << "X.Z NAN" << std::endl;
-            if(isnan(t))
-                std::cout << "T NAN" << std::endl;
-            if(isnan(dir.z()))
-                std::cout << "DIR.Z NAN" << std::endl;
+            /// Compute transmittance and sample density
+            Color3f Tr = std::exp(-_mu_t * t * ray.d.norm());   // Hace falta poner ray.d.norm() si es 1 siempre? (creo)????
 
-            return x + t * dir;
+            Color3f density = sampledMedium ? (_mu_t * Tr) : Tr;
+            float pdf = 0.f;
+            for(int i = 0; i < 3; i++)
+            {
+                pdf += density[i];
+            }
+            pdf *= 1.f / 3.f;
+
+            /// If we sampled within the medium, use the right pdf for the weighting, otherwise, 1-cdf
+            if(sampledMedium)
+            {
+                _beta = Tr * currentVolume->getPhaseFunction()->get_mu_s() / pdf;
+            }
+            else
+            {
+                _beta = Tr / pdf;
+            }
+            return sampled_point;
         }
         //else, heterogeneous volume
-        // srand (static_cast <unsigned> (time(0)));
 
-        // float tMax = Vector3f(xz - x0).norm();
-        // Vector3f dir = (xz - x0).normalized();
-        // float tr = 1.f;
-        // float t = 0.f;
-        // int maxSteps = 256;
-        // int nSteps = 0;
-        // while (true) {
-        //     float r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-        //     t -= std::log(1.0f - r) / m_max / mu_t;
-        //     //std::cout << "t_ratio: " << t << " " << tMax << std::endl;
-        //     if(t >= tMax || nSteps >= maxSteps)
-        //         return Color3f(tr, tr, tr);
-        //     std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
-        //     std::cout << "DIR: " << dir.toString() << std::endl;
-        //     std::cout << "T: " << t << std::endl;
-        //     std::cout << "TMAX: " << tMax << std::endl;
-        //     std::cout << "XZ: " << xz.toString() << std::endl;
-        //     std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
-        //     float density = sample_density(x0 + t*dir).x();         /// TODO: We assume only 1 color for now, change it later(?)
-        //     tr *= 1 - std::max((float)0, density / m_max);
-        //     nSteps++;
-        // }
-        // return Color3f(tr, tr, tr);
-        
+        Color3f mu_s = m_phase_function->get_mu_s();
+        Point3f sampled_point = m_volumegrid_mu_t->samplePathStep(ray, its, sampler, mu_s, mu_t, _beta, sampledMedium);
+
+        if(sampledMedium)
+        {
+            nextVolume = currentVolume;
+        }
+        else if(its.mesh->isVolume())
+        {
+            nextVolume = its.mesh->getVolume();
+        }
+
+        return sampled_point;
     }
 
-    Color3f transmittance(const Point3f& x0, const Point3f& xz) const
+    Color3f transmittance(Sampler*& sampler, const Point3f& x0, const Point3f& xz) const
     {
         //if this is a homogeneous volume
         if(!m_heterogeneous)
         {
-            float norm = (x0-xz).norm();
+            float norm = std::min((xz-x0).norm(), std::numeric_limits<float>::infinity());
             Color3f expterm = sample_mu_t(xz) * -1.f;
             return exp(expterm * norm);
         }
         //else, we have a heterogeneous one
+        /// Perform ratio tracking
 
-        /// TODO: Implementar uno de estos 3?:
-        //deltaTracking()
-        //ratioTracking()
-        //monteCarloRayMarching()
-
-        /// TODO: monocanal
-        return m_volumegrid_mu_t->ratioTracking(x0, xz, mu_t.x());      
+        /// TODO: monocanal + revisar para mi queridísimo renderizador 2.0
+        return m_volumegrid_mu_t->ratioTracking(sampler, x0, xz, (mu_t.sum() / 3.f));      
     }
 
     Color3f sample_mu_t(const Point3f& p_world) const

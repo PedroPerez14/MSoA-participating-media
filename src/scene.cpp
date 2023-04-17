@@ -89,135 +89,6 @@ const Emitter * Scene::sampleEmitter(float rnd, float &pdf) const {
 	return m_emitters[index];
 }
 
-/// Intersect a ray that traverses the volumes, storing info about those interactions.
-bool Scene::rayIntersectThroughVolumes(Sampler* sampler, const Ray3f &ray, const Point3f& xt, Intersection& its_out, std::shared_ptr<Volume> startVol, std::vector<VolumetricSegmentRecord>& segs) const
-{
-    //std::cout << "THROUGH VOLUMES XT: " << ray.o.x() << " " << ray.o.y() << " " << ray.o.z() << " " << xt.x() << " " << xt.y() << " " << xt.z() << std::endl;
-    bool done = false;
-    std::vector<std::shared_ptr<Volume>> volumes_traversed;
-    volumes_traversed.reserve(m_volumes.size());
-    volumes_traversed.push_back(startVol);
-    Ray3f _ray(ray.o, ray.d);
-    int n_bounces = 0;
-    while(true)
-    {
-        if(n_bounces > 100)
-        {
-            std::cout << "rayIntersectThroughVolumes(): Too many bounces. Is everything alright? Aborting..." << std::endl;
-            return false;
-        }
-        n_bounces++;        //I could put this here or before every continue, this one's easier though
-
-        Intersection its;
-        bool intersects = rayIntersect(_ray, its);
-        // If we haven´t found the final point of our ray (either xt or its.p)
-        if(!done)
-        {   
-            if(intersects)
-            {
-                float t = (xt - _ray.o).norm();
-                float z = (its.p - _ray.o).norm();
-                if(its.mesh->isVolume())
-                {
-                    
-                    /// Now we choose one volume from the ones we are currently traversing
-                    ///     This is done uniformly (for now), if none traversed, return envVolume
-                    float volume_pdf;
-                    std::shared_ptr<Volume> sampled_vol = sampleVolume(sampler, volumes_traversed, volume_pdf);
-
-                    if(t <= z)
-                    {
-                        VolumetricSegmentRecord vsr(_ray.o, xt, sampled_vol, volume_pdf);
-                        //ISNAN
-                        std::cout << "_XT_INTER_T_LEQ_Z: " << vsr.xs << std::endl;
-                        segs.push_back(vsr);
-                        Vector3f dir = _ray.d;
-                        _ray = Ray3f(xt, dir);
-                        done = true;
-                    }
-                    else
-                    {
-                        VolumetricSegmentRecord vsr(_ray.o, its.p, sampled_vol, volume_pdf);
-                        //ISNAN
-                        std::cout << "_XT_INTER_T_GT_Z: " << vsr.xs << std::endl;
-                        segs.push_back(vsr);
-                        Vector3f dir = _ray.d;
-                        _ray = Ray3f(its.p, dir);
-                    }
-                    // Add the volume to our "currently traversed" list if we aren't already traversing it
-                    // If we are, remove it from the list, because we have just got out of it
-                    auto iter = std::find(volumes_traversed.begin(), volumes_traversed.end(), its.mesh->getVolume());
-                    if(iter != volumes_traversed.end())
-                    {
-                        volumes_traversed.erase(iter);
-                    }
-                    else
-                    {
-                        volumes_traversed.push_back(its.mesh->getVolume());
-                    }
-                    continue;
-                }
-                else
-                {
-                    float volume_pdf;
-                    std::shared_ptr<Volume> sampled_vol = sampleVolume(sampler, volumes_traversed, volume_pdf);
-
-                    if(t <= z)
-                    {
-                        VolumetricSegmentRecord vsr(_ray.o, xt, sampled_vol, volume_pdf);
-                        //ISNAN
-                        std::cout << "_XT_INTER_NOVOL_T_LEQ_Z: " << vsr.xs << std::endl;
-                        segs.push_back(vsr);
-                    }
-                    else
-                    {
-                        VolumetricSegmentRecord vsr(_ray.o, its.p, sampled_vol, volume_pdf);
-                        //ISNAN
-                        std::cout << "_XT_INTER_NOVOL_T_GT_Z: " << vsr.xs << std::endl;
-                        segs.push_back(vsr);
-                    }
-                    its_out = its;
-                    its_out.t = t;
-                    return true;
-                }
-            }
-            else
-            {
-                float volume_pdf;
-                std::shared_ptr<Volume> sampled_vol = m_enviromentalVolumeMedium;//sampleVolume(sampler, volumes_traversed, volume_pdf);
-
-                VolumetricSegmentRecord vsr(_ray.o, xt, sampled_vol, volume_pdf);
-                //ISNAN
-                std::cout << "_XT_NOINTER: " << vsr.xs << std::endl;
-                segs.push_back(vsr);
-                return false;
-            }
-        }
-        else
-        {
-            if(intersects)
-            {
-                if(its.mesh->isVolume())
-                {
-                    //continue, cambiar _ray???
-                    _ray = Ray3f(its.p, ray.d);
-                    continue;
-                }
-                else
-                {
-                    ///TODO: VERY SUS
-                    its_out = its;
-                    return true;
-                }
-            }
-            else
-            {
-                return false;
-            }
-        }
-    }
-}
-
 const std::shared_ptr<Volume> Scene::sampleVolume(Sampler* sampler, std::vector<std::shared_ptr<Volume>> vols, float& pdf) const
 {
     if(vols.size() == 0)
@@ -232,7 +103,6 @@ const std::shared_ptr<Volume> Scene::sampleVolume(Sampler* sampler, std::vector<
 	return vols[index];
 }
 
-// Alternative version, without xt
 bool Scene::rayIntersectThroughVolumes(Sampler* sampler, const Ray3f &ray, Intersection& its_out, std::shared_ptr<Volume> startVol, std::vector<VolumetricSegmentRecord>& segs) const
 {
     bool done = false;
@@ -263,25 +133,32 @@ bool Scene::rayIntersectThroughVolumes(Sampler* sampler, const Ray3f &ray, Inter
                 /// Now we choose one volume from the ones we are currently traversing
                 ///     This is done uniformly (for now), if none traversed, return envVolume
                 float volume_pdf;
-                std::shared_ptr<Volume> sampled_vol = sampleVolume(sampler, volumes_traversed, volume_pdf);
-                VolumetricSegmentRecord vsr(_ray.o, its.p, sampled_vol, volume_pdf);
-                //ISNAN
-                std::cout << "_NO_XT_INTER_VOL: " << vsr.xs << std::endl;
-                segs.push_back(vsr);
                 Vector3f dir = _ray.d;
-                _ray = Ray3f(its.p, dir);
-
+                bool delete_vol = false;
+                _ray = Ray3f(its.p + (Epsilon * dir), dir);
+                std::shared_ptr<Volume> sampled_vol;
+                
                 // Add the volume to our "currently traversed" list if we aren't already traversing it
                 // If we are, remove it from the list, because we have just got out of it
                 auto iter = std::find(volumes_traversed.begin(), volumes_traversed.end(), its.mesh->getVolume());
                 if(iter != volumes_traversed.end())
                 {
+                    //If on the list, delete it because we are getting outside of it
+                    sampled_vol = sampleVolume(sampler, volumes_traversed, volume_pdf);
                     volumes_traversed.erase(iter);
                 }
                 else
                 {
+                    //Otherwise, it's a new volume (we are entering it) and we add it to the list
+                    sampled_vol = sampleVolume(sampler, volumes_traversed, volume_pdf);
                     volumes_traversed.push_back(its.mesh->getVolume());
                 }
+
+                
+                VolumetricSegmentRecord vsr(_ray.o, its.p, sampled_vol, volume_pdf);
+                //ISNAN ?
+                //std::cout << "_NO_XT_INTER_VOL: " << vsr.xs << std::endl;
+                segs.push_back(vsr);
 
                 continue;
             }
@@ -291,7 +168,7 @@ bool Scene::rayIntersectThroughVolumes(Sampler* sampler, const Ray3f &ray, Inter
                 std::shared_ptr<Volume> sampled_vol = sampleVolume(sampler, volumes_traversed, volume_pdf);
                 VolumetricSegmentRecord vsr(_ray.o, its.p, sampled_vol, volume_pdf);
                 //ISNAN
-                std::cout << "_NO_XT_INTER_NOVOL: " << vsr.xs << std::endl;
+                //std::cout << "_NO_XT_INTER_NOVOL: " << vsr.xs << std::endl;
                 segs.push_back(vsr);
                 its_out = its;
                 return true;
@@ -305,7 +182,7 @@ bool Scene::rayIntersectThroughVolumes(Sampler* sampler, const Ray3f &ray, Inter
             VolumetricSegmentRecord vsr(_ray.o, _ray.o + ray.d * 1.f, sampled_vol, volume_pdf);
             //ISNAN
             //std::cout << "KAMEHAMEHA: " << vsr.xs << std::endl;
-            std::cout << "_NO_XT_NOINTER: " << vsr.xs << std::endl;
+            //std::cout << "_NO_XT_NOINTER: " << vsr.xs << std::endl;
             segs.push_back(vsr);
             return false;
         }
@@ -325,7 +202,7 @@ bool Scene::shadowRayThroughVolumes(Sampler* sampler, const Ray3f& sray, std::sh
     {
         if(n_bounces > 100)
         {
-            std::cout << "rayIntersectThroughVolumes(no xt): Too many bounces. Is everything alright? Aborting..." << std::endl;
+            //std::cout << "rayIntersectThroughVolumes(no xt): Too many bounces. Is everything alright? Aborting..." << std::endl;
             return false;
         }
         n_bounces++;        //I could put this here or before every continue, this one's easier though
@@ -338,9 +215,9 @@ bool Scene::shadowRayThroughVolumes(Sampler* sampler, const Ray3f& sray, std::sh
             std::shared_ptr<Volume> sampled_vol = sampleVolume(sampler, volumes_traversed, volume_pdf);
 
             VolumetricSegmentRecord vsr(ray.o, ray.o + ray.d * 1.f, sampled_vol, volume_pdf);
-            std::cout << "_SHRAY_NO_INTER: " << vsr.xs << std::endl;
+            //std::cout << "_SHRAY_NO_INTER: " << vsr.xs << std::endl;
             segs_shadow.push_back(vsr);
-            t += its.t;
+            t += 1000.f;            //TODO distancia si se me va al infinito un rayo
             return false;
         }
         else
@@ -351,7 +228,8 @@ bool Scene::shadowRayThroughVolumes(Sampler* sampler, const Ray3f& sray, std::sh
                 std::shared_ptr<Volume> sampled_vol = sampleVolume(sampler, volumes_traversed, volume_pdf);
                 VolumetricSegmentRecord vsr(ray.o, its.p, sampled_vol, volume_pdf);
                 t += its.t;
-                ray = Ray3f(its.p, ray.d);
+                ray = Ray3f(its.p + (ray.d * Epsilon), ray.d);
+                //continue;
             }
             else
             {

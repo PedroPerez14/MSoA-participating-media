@@ -33,7 +33,7 @@
 
 using namespace nori;
 
-static int threadCount = 1;
+static int threadCount = 10;
 
 static void renderBlock(const Scene *scene, Sampler *sampler, ImageBlock &block) {
     const Camera *camera = scene->getCamera();

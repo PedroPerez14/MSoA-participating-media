@@ -3,6 +3,8 @@
 #include <nori/scene.h>
 #include <nori/emitter.h>
 #include <nori/bsdf.h>
+#include <nori/volume.h>
+#include <nori/phasefunction.h>
 #include <exception>
 
 NORI_NAMESPACE_BEGIN
@@ -19,38 +21,132 @@ public:
         return LiRec(scene, sampler, ray, currentVolumeMedium, 0);
     }
 
-    Color3f LiRec(const Scene* scene, Sampler* sampler, const Ray3f& ray, std::shared_ptr<Volume> currentVolumeMedium, int depth) const
+    Color3f LiRec(const Scene* scene, Sampler* sampler, Ray3f ray, std::shared_ptr<Volume>& currentVolumeMedium, int depth) const
     {
-        std::cout << "---------------------------------------------------" << std::endl;
-        // if(depth > 0)
-        //     return Color3f(1.f);
-        /// TODO: ver qué valor darle a max_depth y no ponerlo feo con un const int
-        //const int max_depth = 128;
-        Intersection its;
-        //Color3f indirect(1.f);
-        //Color3f direct(0.f);
-        //Color3f contrib_indirect(1.f);
-        //int n_bounces = 0;
-        //float prob_alive = 0.95f;
-        //BSDFQueryRecord materialRecord(Vector3f(0.f), Vector2f(0.f));
-        //float pdir_wdir, pdir_wbsdf, pbsdf_wbsdf, pbsdf_wdir;
-        //float w_mis_indir, w_mis_dir;
+        /// TODO: Change this for testing and faster rendering, I guess
+        const int maxDepth = 9999999999;
 
-        
-        //std::vector<unsigned int> volumes_through = std::vector<unsigned int>();
-        //volumes_through.reserve(scene->getVolumes().size());    //We shouldn't be able to traverse a volume twice at the same time
-
-        //Check if the camera is inside any volume at start of execution
-        //isCameraInsideAnyVolume(scene, volumes_through);
-        //getCurrentVolume(volumes_through, scene->getVolumes(), scene);
-
-
-        //Color3f Lems(0.f), Lmat(0.f);
+        bool specularBounce = false;
         Color3f L(0.f);
-        float pdf_pathstep, pdf_succ, pdf_fail;
-        
-        //Boundary of the medium
+        Color3f beta(1.f, 1.f, 1.f);     //Same notation as PBR Book, this would be Tr() / p(t) or Tr() / 1-cdf() depending on the interaction
 
+        for(int bounces = 0; ; ++bounces)
+        {
+            //std::cout << "---------------------------------------------------" << std::endl;
+            Intersection its;
+            Point3f xt;
+            bool foundIntersection = scene->rayIntersect(ray, its); 
+            std::shared_ptr<Volume> nextVolumeMedium;
+            bool sampledMedium = false;
+
+            /// If we intersect anything and our current ray comes from any medium
+            /// Sample the participating medium, if present
+            if(foundIntersection && currentVolumeMedium)
+            {
+                // The intersection distance will be stored in its.t
+                // So we sample an interaction
+                // And later we will check if it's < its.t or >= its.t to get a medium interaction or geometry intersection
+                Color3f _beta(1.f);
+                xt = currentVolumeMedium->samplePathStep(ray, its, sampler, _beta, nextVolumeMedium, currentVolumeMedium, sampledMedium);
+                beta *= _beta;
+            }
+
+            if(sqrt(beta.abs2().sum()) < Epsilon) // isBlack check
+            {
+                break;
+            }
+
+            /// If it's a medium interaction
+            if(sampledMedium)
+            {
+                if(bounces >= maxDepth) break;              //check this
+                L += beta * inscattering(scene, sampler, currentVolumeMedium, xt, ray.d);
+                PFQueryRecord pfqr(-ray.d);
+                currentVolumeMedium->getPhaseFunction()->sample(pfqr, sampler->next2D());
+                ray = Ray3f(xt, pfqr.wo);
+                specularBounce = false;
+            }
+            else
+            {
+
+                if(bounces == 0 || specularBounce)
+                {
+                    if(foundIntersection)
+                    {
+                        if(its.mesh->isEmitter())
+                        {
+                            EmitterQueryRecord er(its.mesh->getEmitter(), ray.o, its.p, its.shFrame.n, its.uv);
+                            L += beta * its.mesh->getEmitter()->eval(er);
+                            return L;           /// TODO: ojo! a lo mejor este return sobra!
+                        }
+                    }
+                    else
+                    {
+                        L += beta * scene->getBackground(ray);
+                        return L;               /// TODO: ojo! a lo mejor este return sobra!
+                    }
+                }
+
+                /// Terminate path if no intersection was found or maxDepth was reached
+                if(!foundIntersection || bounces >= maxDepth)
+                    break;  /// TODO: Revisar, si se va a la nada no tengo que ponerle la luz de fondo?
+                
+                /// Skip over medium boundaries
+                if(its.mesh->isVolume())
+                {
+                    ray = Ray3f(its.p, ray.d);  /// TODO: Sumo epsilon o no?
+                    bounces--;
+                    
+                    if(!sampledMedium && currentVolumeMedium == nextVolumeMedium)
+                    {
+                        currentVolumeMedium = scene->getEnviromentalVolumeMedium();
+                    }
+                    else
+                    {
+                        currentVolumeMedium = nextVolumeMedium;
+                    }
+                    continue;
+                }
+
+                /// Sample illumination from lights to find attenuated path contribution
+                L += beta * directLight(scene, sampler, currentVolumeMedium, its, ray.d);
+
+                /// TODO: Creo que esto lo puedo hacer directamente en el UniformSampleOneLight (que mejor le dejo el nombre original o ké)
+                /// Sample BSDF to get new path direction
+                BSDFQueryRecord materialRecord = BSDFQueryRecord(its.toLocal(-ray.d), its.uv); //Esto me lo están sacando de los sample_direct, sample_material, sample_pf aquí para poder reusar el mismo método en todas partes
+                Color3f fs = its.mesh->getBSDF()->sample(materialRecord, sampler->next2D());
+
+                /// TODO: revisar
+                if(sqrt(fs.abs2().sum()) < Epsilon || isnan(fs.x()) || isnan(fs.y()) || isnan(fs.z()))     // If isBlack() or pdf == 0 (which produces NaNs in fs)
+                {
+                    break;
+                }
+                beta *= fs;     //TODO: acomodar luego a lo que me vaya pidiendo el codiguín
+                specularBounce = !its.mesh->getBSDF()->isDiffuse();
+                ray = Ray3f(its.p + ray.d * Epsilon, its.toWorld(materialRecord.wo));
+            }
+
+            /// Possibly terminate the path with Russian Roulette
+            if(bounces > 3)
+            {
+                float rr = std::max(0.01f, 1 - beta.y());
+                if(sampler->next1D() < rr)
+                {
+                    break;
+                }
+                beta /= (1.f - rr);
+            }
+        }
+        return L;
+            
+
+
+        ///
+        /// OLD VERSION, RECURSIVE, DOES NOT WORK PROPERLY
+        ///
+
+
+        /*
         Point3f xt(0.f);
         xt = currentVolumeMedium->samplePathStep(ray.o, Point3f(10000.f), ray.d, sampler->next2D(), pdf_succ, pdf_fail);
         std::vector<VolumetricSegmentRecord> volumeSegments;
@@ -102,6 +198,7 @@ public:
         }
         
         return (L / pdf_pathstep);
+        */
     }
     
     std::string toString() const
@@ -142,7 +239,7 @@ private:
 
     Color3f emitterSampling(const Scene* scene, Sampler* sampler, std::shared_ptr<Volume> currentVolumeMedium, const Intersection& its, const Vector3f& w, float& w_mis_dir) const
     {
-        Color3f Lems(Epsilon);
+        Color3f Lems(0.f);
         float pdflight(1.f);
         float pdir_wdir(1.f), pbsdf_wdir(0.f);
 
@@ -151,7 +248,6 @@ private:
         BSDFQueryRecord materialRecord = BSDFQueryRecord(its.toLocal(-w), its.toLocal(emitterRecord.wi), its.uv, ESolidAngle);
         its.mesh->getBSDF()->sample(materialRecord, sampler->next2D());
 
-        Intersection shray_its = Intersection();
         Color3f Le = em->sample(emitterRecord, sampler->next2D(), 0.f);
         
         Ray3f shadowray(its.p, emitterRecord.wi);
@@ -162,7 +258,7 @@ private:
             //std::cout << "EmitterSampling: IN-ShadowRay" << std::endl;
             BSDFQueryRecord bsdfRecord(its.toLocal(-w), its.toLocal(emitterRecord.wi), its.uv, ESolidAngle);
             //Color3f mu_s = currentVolumeMedium->getPhaseFunction()->get_mu_s();
-            Lems = Le * volumetric_transmittance(shadow_vsr) * its.mesh->getBSDF()->eval(bsdfRecord) * abs(its.shFrame.n.dot(emitterRecord.wi)) / pdflight;
+            Lems = Le * volumetric_transmittance(sampler, shadow_vsr) * its.mesh->getBSDF()->eval(bsdfRecord) * abs(its.shFrame.n.dot(emitterRecord.wi)) / pdflight;
 
             //MIS for emitter sampling
             pdir_wdir = em->pdf(emitterRecord);
@@ -177,24 +273,23 @@ private:
         
     }
 
-    Color3f volumetric_transmittance(const std::vector<VolumetricSegmentRecord>& vsr) const
+    Color3f volumetric_transmittance(Sampler*& sampler, const std::vector<VolumetricSegmentRecord>& vsr) const
     {
-        std::cout << "VOL_TRANS: [";
+        //std::cout << "VOL_TRANS: [";
         Color3f throughput(1.f);
 
-        for(size_t i = 0; i < vsr.size(); i++)
-        {
-            std::cout << "[" << vsr[i].segment_vol->isHeterogeneous() << " " << vsr[i].x0.toString() << " " << vsr[i].xs.toString() << "]";
-        }
-        std::cout << "]" << std::endl;
+        // for(size_t i = 0; i < vsr.size(); i++)
+        // {
+        //     std::cout << "[" << vsr[i].segment_vol->isHeterogeneous() << " " << vsr[i].x0.toString() << " " << vsr[i].xs.toString() << "]";
+        // }
+        // std::cout << "]" << std::endl;
         
         for(size_t i = 0; i < vsr.size(); i++)
         {
-            Color3f a = vsr[i].segment_vol->transmittance(vsr[i].x0, vsr[i].xs);
-            float pdf = vsr[i].vol_pdf;                                               /////// QUITARRR
+            Color3f a = vsr[i].segment_vol->transmittance(sampler, vsr[i].x0, vsr[i].xs);
+            float pdf = 1.0f; //vsr[i].vol_pdf;                                               /////// TODO: QUITAR
             throughput *= (a / pdf);
         }
-        
         return throughput;
     }
 
@@ -206,6 +301,7 @@ private:
         float pdflight(1.f);
         float pdir_wdir(1.f), ppf_wdir(0.f);
         
+        /// Sample light source with Multiple Importance Sampling
         const Emitter* em = scene->sampleEmitter(sampler->next1D(), pdflight);
         EmitterQueryRecord emitterRecord(xt);
         Intersection shray_its;
@@ -216,16 +312,17 @@ private:
         std::vector<VolumetricSegmentRecord> shadow_vsr;
         if(emitterShRayIntersectFree(scene, sampler, shadowray, emitterRecord, currentVolumeMedium, shadow_vsr))
         {
+            /// Compute Phase Function value using Emitter Sampling sampled direction
             PFQueryRecord pfRecord(-w, emitterRecord.wi);
-            Color3f mu_s = currentVolumeMedium->getPhaseFunction()->get_mu_s();
-            Lems = Le * volumetric_transmittance(shadow_vsr) * currentVolumeMedium->getPhaseFunction()->eval(pfRecord) * mu_s / pdflight;
+            //Color3f mu_s = currentVolumeMedium->getPhaseFunction()->get_mu_s();
+            Lems = Le * volumetric_transmittance(sampler, shadow_vsr) * currentVolumeMedium->getPhaseFunction()->eval(pfRecord) / pdflight;      /// TODO: He quitado el * mu_s en las reformas a iterativo según PBRBook
 
-            //MIS for emitter sampling
+            //MIS weight for emitter sampling
             pdir_wdir = em->pdf(emitterRecord);
             ppf_wdir = currentVolumeMedium->getPhaseFunction()->pdf(pfRecord);
             
             w_mis_dir = balanceHeuristic(pdir_wdir, ppf_wdir);
-                        
+            
         }
         return Lems;
     }
@@ -255,7 +352,7 @@ private:
                 EmitterQueryRecord emitterRecordAux(itsaux.mesh->getEmitter(), its.p, itsaux.p, itsaux.shFrame.n, itsaux.uv);
                 pdir_wbsdf = (pow(emitterRecordAux.dist, 2.0f) / abs(emitterRecordAux.n.dot(emitterRecordAux.wi)));//emitterRecordAux.emitter->pdf(emitterRecordAux) * scene->pdfEmitter(emitterRecordAux.emitter);
                 emit = emitterRecordAux.emitter->eval(emitterRecordAux);
-                transmittance = volumetric_transmittance(vsr_shadow);
+                transmittance = volumetric_transmittance(sampler, vsr_shadow);
             }
             else
             {
@@ -265,7 +362,7 @@ private:
                 scene->getEnvironmentalEmitter()->sample(emitterRecordAux, sampler->next2D(), 0.f);
                 pdir_wbsdf = scene->getEnvironmentalEmitter()->pdf(emitterRecordAux);
                 emit = scene->getEnvironmentalEmitter()->eval(emitterRecordAux);
-                transmittance = volumetric_transmittance(vsr_shadow);
+                transmittance = volumetric_transmittance(sampler, vsr_shadow);
             }
 
             if(materialRecord.measure == EDiscrete)
@@ -283,7 +380,7 @@ private:
 
     Color3f phaseFunctionSampling(const Scene* scene, Sampler* sampler, std::shared_ptr<Volume> currentVolumeMedium, const Point3f& xt, const Vector3f& w, float& w_mis_indir, Vector3f& wo_pf, float& fs) const
     {
-        Color3f Lpf(Epsilon);
+        Color3f Lpf(0.f);
 
         PFQueryRecord pfRecord(-w);
         fs = currentVolumeMedium->getPhaseFunction()->sample(pfRecord, sampler->next2D());
@@ -292,9 +389,7 @@ private:
 
         Ray3f ray(xt, pfRecord.wo);
         std::vector<VolumetricSegmentRecord> vsr_shadow;
-        float inf = std::numeric_limits<float>::infinity();
         bool intersects_aux = scene->rayIntersectThroughVolumes(sampler, ray, itsaux, currentVolumeMedium, vsr_shadow);
-        // std::cout << "POST INTERSECT 3" << std::endl;
         if((intersects_aux && itsaux.mesh->isEmitter()) || (!intersects_aux && scene->getEnvironmentalEmitter()))
         {
             float ppf_wpf = pfRecord.m_pdf;
@@ -308,7 +403,7 @@ private:
                 emitterRecordAux = EmitterQueryRecord(itsaux.mesh->getEmitter(), xt, itsaux.p, itsaux.geoFrame.n, itsaux.uv);
                 pdir_wpf = (pow(emitterRecordAux.dist, 2.0f) / abs(emitterRecordAux.n.dot(emitterRecordAux.wi)));//emitterRecordAux.emitter->pdf(emitterRecordAux) * scene->pdfEmitter(emitterRecordAux.emitter);
                 emit = emitterRecordAux.emitter->eval(emitterRecordAux);
-                transmittance = volumetric_transmittance(vsr_shadow);
+                transmittance = volumetric_transmittance(sampler, vsr_shadow);
             }
             else
             {
@@ -318,35 +413,37 @@ private:
                 scene->getEnvironmentalEmitter()->sample(emitterRecordAux, sampler->next2D(), 0.f);
                 pdir_wpf = scene->getEnvironmentalEmitter()->pdf(emitterRecordAux);
                 emit = scene->getEnvironmentalEmitter()->eval(emitterRecordAux);
-                transmittance = volumetric_transmittance(vsr_shadow);
+                transmittance = volumetric_transmittance(sampler, vsr_shadow);
             }
 
             w_mis_indir = balanceHeuristic(ppf_wpf, pdir_wpf);
 
-            Color3f mu_s = currentVolumeMedium->getPhaseFunction()->get_mu_s();
-            Lpf = fs * emit * transmittance * mu_s;
+            //Color3f mu_s = currentVolumeMedium->getPhaseFunction()->get_mu_s();
+            Lpf = fs * emit * transmittance;   /// TODO: He quitado el * mu_s en las reformas a iterativo según PBRBook
         }
         return Lpf;
     }
 
 
-    Color3f directLight(const Scene* scene, Sampler* sampler, std::shared_ptr<Volume> currentVolumeMedium, std::shared_ptr<Volume> xzVolumeMedium, const Intersection& its, const Vector3f& w, int n_bounces) const
+    Color3f directLight(const Scene* scene, Sampler* sampler, std::shared_ptr<Volume> currentVolumeMedium, const Intersection& its, const Vector3f& w) const
     {
         Color3f Lems(0.f), Lmat(0.f), fs_bsdf(0.f);
         float w_mis_dir(0.f), w_mis_indir(0.f);
         Vector3f wo_brdf;
 
-        Lems = emitterSampling(scene, sampler, xzVolumeMedium, its, w, w_mis_dir);
+        Lems = emitterSampling(scene, sampler, currentVolumeMedium, its, w, w_mis_dir);
         if(!isnan(w_mis_dir))
                 Lems *= w_mis_dir;
         //std::cout << "directLight postEmitterSampling" << std::endl;
-        Lmat = brdfSampling(scene, sampler, xzVolumeMedium, its, w, w_mis_indir, wo_brdf, fs_bsdf);
+        Lmat = brdfSampling(scene, sampler, currentVolumeMedium, its, w, w_mis_indir, wo_brdf, fs_bsdf);
         //std::cout << "directLight postBRDFSampling" << std::endl;
         if(!isnan(w_mis_indir))
                 Lmat *= w_mis_indir;
 
         Color3f Lnee = Lems + Lmat;
-
+        return Lnee;
+        
+        /*
         float prob_alive = 0.95f;
         if(n_bounces > 2 && sampler->next1D() > prob_alive)
         {
@@ -358,26 +455,28 @@ private:
             return Lnee * (fs_bsdf * LiRec(scene, sampler, Ray3f(its.p, wo_brdf), xzVolumeMedium, n_bounces + 1) / (prob_alive));
         else
             return Lnee * (fs_bsdf * LiRec(scene, sampler, Ray3f(its.p, wo_brdf), xzVolumeMedium, n_bounces + 1));
+        */
     }
 
-    Color3f inscattering(const Scene* scene, Sampler* sampler, std::shared_ptr<Volume> currentVolumeMedium, std::shared_ptr<Volume> xtVolumeMedium, const Point3f& xt, const Vector3f& w, int n_bounces) const
+    Color3f inscattering(const Scene* scene, Sampler* sampler, std::shared_ptr<Volume> currentVolumeMedium, const Point3f& xt, const Vector3f& w) const
     {
         
         Color3f Lems(0.f), Lpf(0.f);
         float w_mis_dir(0.f), w_mis_pf(0.f), fs_pf(Epsilon);
         Vector3f wo_pf;
 
-        Lems = emitterSamplingPF(scene, sampler, xtVolumeMedium, xt, w, w_mis_dir);
+        Lems = emitterSamplingPF(scene, sampler, currentVolumeMedium, xt, w, w_mis_dir);
         if(!isnan(w_mis_dir))
                 Lems *= w_mis_dir;
 
-        //std::cout << "inscattering postEmitterSamplingPF" << std::endl;
-        Lpf = phaseFunctionSampling(scene, sampler, xtVolumeMedium, xt, w, w_mis_pf, wo_pf, fs_pf);
+        Lpf = phaseFunctionSampling(scene, sampler, currentVolumeMedium, xt, w, w_mis_pf, wo_pf, fs_pf);
         if(!isnan(w_mis_pf))
                 Lpf *= w_mis_pf;
-        //std::cout << "inscattering postPhaseFunctionSampling" << std::endl;
-        Color3f Lnee = Lems + Lpf;
 
+        Color3f Lnee = Lems + Lpf;
+        
+        return Lnee * fs_pf;    /// fs_pf???
+        /*
         float prob_alive = 0.95f;
         if(n_bounces > 2 && sampler->next1D() > prob_alive)
         {
@@ -399,6 +498,7 @@ private:
             return Lnee * (fs_pf * LiRec(scene, sampler, Ray3f(xt, wo_pf), xtVolumeMedium, n_bounces + 1) / prob_alive);
         else
             return Lnee * (fs_pf * LiRec(scene, sampler, Ray3f(xt, wo_pf), xtVolumeMedium, n_bounces + 1));
+        */
     }
 };
 

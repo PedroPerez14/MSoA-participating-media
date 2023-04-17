@@ -77,6 +77,7 @@ add_executable(nori
   include/nori/phasefunction.h
   include/nori/volume.h
   include/nori/volumedatabase.h
+  include/nori/intersection.h
 
   # Source code files
   src/accel.cpp

@@ -9,11 +9,11 @@
 
 #pragma once
 
-#include <nori/object.h>
+#include <memory>
 #include <nori/phasefunction.h>
-#include <nori/frame.h>             //TODO: Quitar? no sé si me hará falta para cuando tenga los .vdb
-#include <nori/warp.h>              //TODO: Quitar? ...
-#include <nori/texture.h>
+#include <nori/intersection.h>
+#include <nori/object.h>
+#include <nori/sampler.h>
 
 NORI_NAMESPACE_BEGIN
 
@@ -24,13 +24,11 @@ class Volume : public NoriObject
 {
 public:
 
-    virtual Point3f samplePathStep(const Point3f& x, const Point3f& xz, const 
-        Vector3f& dir, const Vector2f& sample, float& pdf_failure, float& pdf_success) const = 0;
+    virtual Point3f samplePathStep(const Ray3f& ray, const Intersection& its, Sampler*& sampler, Color3f& _beta, std::shared_ptr<Volume>& nextVolume, std::shared_ptr<Volume>& currentVolume, bool& sampledMedium) const = 0;
 
     virtual float pdfFail(const Point3f& xz, const float& z, const Vector2f& sample) const = 0;
 
-
-    virtual Color3f transmittance(const Point3f& x0, const Point3f& xz) const = 0;
+    virtual Color3f transmittance(Sampler*& sampler, const Point3f& x0, const Point3f& xz) const = 0;
 
     virtual Color3f sample_mu_t(const Point3f& p_world) const = 0;
 

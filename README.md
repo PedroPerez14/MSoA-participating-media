@@ -6,7 +6,10 @@ It supports ```.vdb``` file loading in an indirect manner, by converting them to
 
 The integrator also incorporates null-collision techniques such as Woodcock Tracking for the distance sampling, and Ratio Tracking for the transmittance estimation.
 
-# Details
+# Report
+The report with some details on the implemented techniques can be found [here](https://github.com/PedroPerez14/MSoA-participating-media/edit/master/report_compressed.pdf)!
+
+# Compilation details
 Since it's an academic project there are not many details about how the program works, or how to compile and run it. If you need them feel free to contact me.
 
 # Renders
